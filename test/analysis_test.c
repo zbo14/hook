@@ -8,6 +8,7 @@ int main() {
 	assert (7 == hamming_dist(b1, b2, len));
 
 	/*
+
 	Segments *s = segments(0.9, "/Users/zach/Desktop/music/rhapsody_1.mp3", 4096);
 	Sgram *sgram = default_spectrogram(s);
 	Peaks *peaks = default_find_peaks(sgram);
@@ -17,27 +18,28 @@ int main() {
 	sgram = default_spectrogram(s);
 	peaks = default_find_peaks(sgram);
 	Constellation *c2 = default_constellate(peaks);
-
-	double score = compare_constellations(c1, c2, 0.1);
-	printf("score: %f\n", score);
+	
 	*/
-
+	
 	Segments *s = segments(0.9, "/Users/zach/Desktop/music/rhapsody_1.mp3", 8192);
 	Egram *egram = default_entropygram(s);
-	EFprint *fprint1 = efp(egram);
+	Fprint *fprint1 = ses(egram);
 
 	s = segments(0.9, "/Users/zach/Desktop/music/rhapsody_2.mp3", 8192);
 	egram = default_entropygram(s);
-	EFprint *fprint2 = efp(egram);
+	Fprint *fprint2 = ses(egram);
 	
 	double diff = dtw(fprint1, fprint2);
 	printf("DTW DIFF: %f\n", diff);
 
-	double sim = lcs(0.2, fprint1, fprint2);
+	double sim = default_lcs(fprint1, fprint2);
 	printf("LCS SIM: %f\n", sim);
 
-	diff = levenshtein(0.2, fprint1, fprint2);
+	diff = default_levenshtein(fprint1, fprint2);
 	printf("LEVENSHTEIN DIFF: %f\n", diff);
+
+	free(fprint1);
+	free(fprint2);
 
 	return SUCCESS;
 }

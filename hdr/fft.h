@@ -6,7 +6,7 @@
 #include "signal.h"
 
 
-int fft_decimation_freq(size_t len, double complex * z) {
+int fft_decimation_freq(unsigned int const len, double complex * z) {
 	if (!pow2(len)) {
 		return FAILURE;
 	}
@@ -38,7 +38,7 @@ int fft_decimation_freq(size_t len, double complex * z) {
 }
 
 
-int inv_decimation_freq(size_t len, double complex * z) {
+int inv_decimation_freq(unsigned int const len, double complex * z) {
 	if (!pow2(len)) {
 		return FAILURE;
 	}
@@ -55,13 +55,13 @@ int inv_decimation_freq(size_t len, double complex * z) {
 	return SUCCESS;
 }
 
-int fft_decimation_time(size_t const len, double complex *z) {
+int fft_decimation_time(unsigned int const len, double complex *z) {
 	if (!pow2(len)) {
 		return FAILURE;
 	}
 	int a, b, i, j, k;
 	int log2 = log2_floor(len);
-	size_t sz = len * sizeof(double complex);
+	unsigned int sz = len * sizeof(double complex);
 	double complex *q;
 	if (NULL == (q = malloc(sz))) {
 		return FAILURE;
@@ -91,7 +91,7 @@ int fft_decimation_time(size_t const len, double complex *z) {
 	return SUCCESS;
 }
 
-int inv_decimation_time(size_t const len, double complex * z) {
+int inv_decimation_time(unsigned int const len, double complex * z) {
 	if (!pow2(len)) {
 		return FAILURE;
 	}
@@ -108,12 +108,12 @@ int inv_decimation_time(size_t const len, double complex * z) {
 	return SUCCESS;
 }
 
-int fft_real(size_t const len, double complex *z) {
+int fft_real(unsigned int const len, double complex *z) {
 	if (!pow2(len)) {
 		return FAILURE;
 	}
 	int len2 = len >> 1, len4 = len >> 2;
-	size_t sz = len * sizeof(double complex);
+	unsigned int const sz = len * sizeof(double complex);
 	double complex *p;
 	if (NULL == (p = malloc(sz))) {
 		return FAILURE;
@@ -151,7 +151,7 @@ int fft_real(size_t const len, double complex *z) {
 	return SUCCESS;
 }
 
-int inv_real(size_t len, double complex *z) {
+int inv_real(unsigned int const len, double complex *z) {
 	if (!pow2(len)) {
 		return FAILURE;
 	}

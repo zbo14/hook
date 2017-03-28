@@ -2,7 +2,7 @@
 #include <math.h>
 #include <complex.h>
 
-void window(size_t len, double(*win)(unsigned int, size_t), double complex * z) {
+void window(unsigned int len, double(*win)(unsigned int, unsigned int), double complex * z) {
 	if (len > 1) {
 		int i;
 		for (i = 0; i < len; i++) {
@@ -11,14 +11,14 @@ void window(size_t len, double(*win)(unsigned int, size_t), double complex * z) 
 	}
 }
 
-double blackman(unsigned int i, size_t len) {
+double blackman(unsigned int i, unsigned int len) {
 	return 0.42 - 0.5*cos(2*i*M_PI/len) + 0.08*cos(4*i*M_PI/len);
 }
 
-double hamming(unsigned int i, size_t len) {
+double hamming(unsigned int i, unsigned int len) {
 	return 0.54 - 0.46*cos(2*i*M_PI/len);
 }
 
-double hanning(unsigned int i, size_t len) {
+double hanning(unsigned int i, unsigned int len) {
 	return 0.5 - 0.5*cos(2*i*M_PI/len);
 }

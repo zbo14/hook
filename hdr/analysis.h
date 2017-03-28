@@ -1,20 +1,18 @@
 #include <stdio.h>
-#include <assert.h>
 #include <math.h>
 #include "fft.h"
 #include "window.h"
 
 #define BANDS 24
-#define EFP_SIZE 3
 #define FAN_VALUE 15
 #define NEIGHBORHOOD_SIZE 20
 #define OVERLAP_RATIO 0.9
 #define SAMPLING_RATE 44100
-#define SFP_SIZE 24
+#define SES_SIZE 3
 #define TIME_DELTA 200
 #define WINDOW_SIZE 8192
 
-int hamming_dist(uint8_t *bytes1, uint8_t *bytes2, size_t len) {
+int hamming_dist(uint8_t *bytes1, uint8_t *bytes2, unsigned int len) {
 	int dist = 0, i, j;
 	for (i = 0; i < len; i++) {
 		for (j = 0; j < 8; j++) {
@@ -37,12 +35,12 @@ double freq_to_bark(double freq) {
 }
 
 typedef struct _Egram {
-	size_t num;
-	size_t seglen;
+	unsigned int num;
+	unsigned int seglen;
 	double **segs;
 } Egram;
 
-Egram* entropygram(unsigned int fs, Segments *s, double(*win)(unsigned int, size_t)) {
+Egram* entropygram(unsigned int fs, Segments *s, double(*win)(unsigned int, unsigned int)) {
 	int seglen2 = (s->seglen)>>1;
 	int *bands;
 	if (NULL == (bands = malloc(BANDS * sizeof(int)))) {
@@ -74,7 +72,7 @@ Egram* entropygram(unsigned int fs, Segments *s, double(*win)(unsigned int, size
 		for (j = 0; j < egram->seglen; j++) {
 			z[j] = s->segs[i][j];
 		}
-		free(s->segs[i]);
+		// free(s->segs[i]);
 		window(egram->seglen, win, z);
 		if (FAILURE == fft_real(egram->seglen, z)) {
 			return NULL;
@@ -100,7 +98,7 @@ Egram* entropygram(unsigned int fs, Segments *s, double(*win)(unsigned int, size
 		}
 	}
 	free(bands);
-	free(s);
+	// free(s);
 	free(z);
 	return egram;
 }
@@ -110,14 +108,17 @@ Egram* default_entropygram(Segments *s) {
 	return entropygram(SAMPLING_RATE, s, hanning);
 }
 
-typedef struct _EFprint {
-	size_t num;
+typedef struct _Fprint {
+	unsigned int num;
 	uint8_t **segs;
-} EFprint;
+} Fprint;
 
-EFprint* efp(Egram *egram) {
-	EFprint *fprint;
-	if (NULL == (fprint = malloc(sizeof(EFprint)))) {
+// Spectral Entropy Signature (SES)
+// Adapted from "Robust Audio-Fingerprinting With Spectral Entropy Signatures", (Camarena-Ibarrola, Chavez)
+
+Fprint* ses(Egram *egram) {
+	Fprint *fprint;
+	if (NULL == (fprint = malloc(sizeof(Fprint)))) {
 		return NULL;
 	}
 	if (NULL == (fprint->segs = malloc(egram->num * sizeof(uint8_t*)))) {
@@ -126,9 +127,9 @@ EFprint* efp(Egram *egram) {
 	fprint->num = egram->num;
 	int i, j;
 	for (i = 0; i < fprint->num; i++) {
-		fprint->segs[i] = malloc(EFP_SIZE * sizeof(uint8_t));
+		fprint->segs[i] = malloc(SES_SIZE * sizeof(uint8_t));
 		if (i == 0) {
-			for (j = 0; j < EFP_SIZE; j++) {
+			for (j = 0; j < SES_SIZE; j++) {
 				fprint->segs[i][j] = 0;
 			}
 			continue;
@@ -138,15 +139,15 @@ EFprint* efp(Egram *egram) {
 				fprint->segs[i][j/8] |= (1 << (j%8));
 			}
 		}
-		if (i > 0) {
-		 	free(egram->segs[i-1]);
-		}
+		// if (i > 0) {
+		// 	free(egram->segs[i-1]);
+		// }
 	}
-	free(egram);
+	// free(egram);
 	return fprint;
 }
 
-double dtw(EFprint *fprint1, EFprint *fprint2) {
+double dtw(Fprint *fprint1, Fprint *fprint2) {
 	int *col1, *col2;  
 	if (NULL == (col1 = malloc(fprint2->num * sizeof(int)))) {
 		return FAILURE;
@@ -158,14 +159,14 @@ double dtw(EFprint *fprint1, EFprint *fprint2) {
 	for (i = 0; i < fprint1->num; i++) {
 		for (j = 0; j < fprint2->num; j++) {
 			if (i == 0 || j == 0) {
-				col2[j] = hamming_dist(fprint1->segs[i], fprint2->segs[j], EFP_SIZE);
+				col2[j] = hamming_dist(fprint1->segs[i], fprint2->segs[j], SES_SIZE);
 			} else {
 				if (col1[j-1] < col1[j] && col1[j-1] < col2[j-1]) {
-					col2[j] = col1[j-1] + 2*hamming_dist(fprint1->segs[i], fprint2->segs[j], EFP_SIZE);
+					col2[j] = col1[j-1] + 2*hamming_dist(fprint1->segs[i], fprint2->segs[j], SES_SIZE);
 				} else if (col1[j] < col1[j-1] && col1[j] < col2[j-1]) {
-					col2[j] = col1[j] + hamming_dist(fprint1->segs[i], fprint2->segs[j], EFP_SIZE);
+					col2[j] = col1[j] + hamming_dist(fprint1->segs[i], fprint2->segs[j], SES_SIZE);
 				} else {
-					col2[j] = col2[j-1] + hamming_dist(fprint1->segs[i], fprint2->segs[j], EFP_SIZE);
+					col2[j] = col2[j-1] + hamming_dist(fprint1->segs[i], fprint2->segs[j], SES_SIZE);
 				}
 			}
 		}
@@ -176,12 +177,12 @@ double dtw(EFprint *fprint1, EFprint *fprint2) {
 	return diff;
 }
 
-double lcs(double eps, EFprint *fprint1, EFprint *fprint2) {
+double lcs(Fprint *fprint1, Fprint *fprint2, unsigned int thresh) {
 	int *col1, *col2;  
-	if (NULL == (col1 = malloc(fprint2->num * sizeof(int)))) {
+	if (NULL == (col1 = malloc((fprint2->num+1) * sizeof(int)))) {
 		return FAILURE;
 	}
-	if (NULL == (col2 = malloc(fprint2->num * sizeof(int)))) {
+	if (NULL == (col2 = malloc((fprint2->num+1) * sizeof(int)))) {
 		return FAILURE;
 	}
 	int i, j;
@@ -190,7 +191,7 @@ double lcs(double eps, EFprint *fprint1, EFprint *fprint2) {
 	}
 	for (i = 0; i < fprint1->num; i++) {
 		for (j = 0; j < fprint2->num; j++) {
-			if (eps > hamming_dist(fprint1->segs[i], fprint2->segs[j], EFP_SIZE)) {
+			if (thresh >= hamming_dist(fprint1->segs[i], fprint2->segs[j], SES_SIZE)) {
 				col2[j+1] = col1[j] + 1;
 			} else if (col2[j] > col1[j+1]) {
 				col2[j+1] = col2[j];
@@ -205,21 +206,26 @@ double lcs(double eps, EFprint *fprint1, EFprint *fprint2) {
 	return sim;
 }
 
-double levenshtein(double eps, EFprint *fprint1, EFprint *fprint2) {
+double default_lcs(Fprint *fprint1, Fprint *fprint2) {
+	return lcs(fprint1, fprint2, 7);
+}
+
+double levenshtein(double eps, Fprint *fprint1, Fprint *fprint2) {
 	int *col1, *col2;  
-	if (NULL == (col1 = malloc(fprint2->num * sizeof(int)))) {
+	if (NULL == (col1 = malloc((fprint2->num+1) * sizeof(int)))) {
 		return FAILURE;
 	}
-	if (NULL == (col2 = malloc(fprint2->num * sizeof(int)))) {
+	if (NULL == (col2 = malloc((fprint2->num+1) * sizeof(int)))) {
 		return FAILURE;
 	}
-	int dist, i, j;
+	double dist;
+	int i, j;
 	for (i = 0; i <= fprint2->num; i++) {
 		col1[i] = i;
 	}
 	for (i = 0; i < fprint1->num; i++) {
 		for (j = 0; j < fprint2->num; j++) {
-			if ((dist = hamming_dist(fprint1->segs[i], fprint2->segs[j], EFP_SIZE)), dist < eps) {
+			if ((dist = (double)hamming_dist(fprint1->segs[i], fprint2->segs[j], SES_SIZE)/BANDS), dist < eps) {
 				col2[j+1] = col1[j];
 			} else if (col1[j] < col2[j] && col1[j] < col1[j+1]) {
 				col2[j+1] = col1[j] + dist;
@@ -241,16 +247,65 @@ double levenshtein(double eps, EFprint *fprint1, EFprint *fprint2) {
 	return diff;
 }
 
-//---------------------------------------------------------------
+double default_levenshtein(Fprint *fprint1, Fprint *fprint2) {
+	return levenshtein(0.1, fprint1, fprint2);
+}
+
+/*
+
+// Time-Warped Longest Common Subsequence (TW-LCS)
+// From "Time-Warped Longest Common Subsequence Algorithm for Music Retrieval", (Guo, Siegelmann)
+
+double twlcs(Fprint *fprint1, Fprint *fprint2, unsigned int thresh) {
+	int *col1, *col2; 
+	if (NULL == (col1 = malloc((fprint2->num+1)*sizeof(int)))) {
+		return FAILURE;
+	}
+	if (NULL == (col2 = malloc((fprint2->num+1)*sizeof(int)))) {
+		return FAILURE;
+	}
+	int i, j;
+	for (i = 0; i < fprint1->num; i++) {
+		for (j = 0; j < fprint2->num; j++) {
+			if (thresh >= hamming_dist(fprint1->segs[i], fprint2->segs[j], SES_SIZE)) {
+				if (col1[j] > col2[j] && col1[j] > col1[j+1]) {
+					col2[j+1] = col1[j] + 1;
+				} else if (col2[j] > col1[j] && col2[j] > col1[j+1]) {
+					col2[j+1] = col2[j] + 1;
+				} else {
+					col2[j+1] = col1[j+1] + 1;
+				}
+			} else {
+				if (col2[j] > col1[j+1]) {
+					col2[j+1] = col2[j];
+				} else {
+					col2[j+1] = col1[j+1];
+				}
+			}
+			col1 = col2;
+		}
+	}
+	double sim = (double)col1[fprint2->num]/(fprint1->num+fprint2->num);
+	free(col1);
+	return sim;
+}
+
+double default_twlcs(Fprint *fprint1, Fprint *fprint2) {
+	return twlcs(fprint1, fprint2, 1);
+}
+
+*/
+
+//-----------------------------------------------------------------------
 
 typedef struct _Sgram {
 	double *freqs;
-	size_t num;
-	size_t seglen;
+	unsigned int num;
+	unsigned int seglen;
 	double **segs;
 } Sgram;
 
-Sgram* spectrogram(unsigned int fs, Segments *s, double(*win)(unsigned int, size_t)) {
+Sgram* spectrogram(unsigned int fs, Segments *s, double(*win)(unsigned int, unsigned int)) {
 	int seglen2 = (s->seglen)>>1;
 	Sgram* sgram;
 	if (NULL == (sgram = malloc(sizeof(Sgram)))) {
@@ -273,7 +328,7 @@ Sgram* spectrogram(unsigned int fs, Segments *s, double(*win)(unsigned int, size
 		for (j = 0; j < s->seglen; j++) {
 			z[j] = s->segs[i][j];
 		}
-		free(s->segs[i]);
+		// free(s->segs[i]);
 		window(s->seglen, win, z);
 		if (FAILURE == fft_real(s->seglen, z)) {
 			return NULL;
@@ -286,7 +341,7 @@ Sgram* spectrogram(unsigned int fs, Segments *s, double(*win)(unsigned int, size
 			sgram->segs[i][j] = log(creal(z[j] * conj(z[j])));
 		}
 	}
-	free(s);
+	// free(s);
 	free(z);
 	return sgram;
 }
@@ -296,8 +351,8 @@ Sgram* default_spectrogram(Segments *s) {
 }
 
 typedef struct _Peaks {
-	size_t num;
-	size_t *seglens;
+	unsigned int num;
+	unsigned int *seglens;
 	double **segs;
 } Peaks;
 
@@ -307,7 +362,7 @@ Peaks* find_peaks(unsigned int nbr, Sgram *sgram) {
 		return NULL;
 	}
 	peaks->num = sgram->num;
-	if (NULL == (peaks->seglens = malloc(peaks->num * sizeof(size_t)))) {
+	if (NULL == (peaks->seglens = malloc(peaks->num * sizeof(unsigned int)))) {
 		return NULL;
 	}
 	if (NULL == (peaks->segs = malloc(peaks->num * sizeof(double*)))) {
@@ -381,7 +436,7 @@ Peaks* default_find_peaks(Sgram *sgram) {
 
 // TODO: calc sha3 checksum
 
-uint8_t* sfp(double peak1, double peak2, uint64_t tdelta) {
+uint8_t* afp(double peak1, double peak2, uint64_t tdelta) {
 	uint8_t *fprint;
 	if (NULL == (fprint = malloc(2*sizeof(double) + sizeof(uint64_t)))) {
 		return NULL;
@@ -394,7 +449,7 @@ uint8_t* sfp(double peak1, double peak2, uint64_t tdelta) {
 
 typedef struct _Constellation {
 	uint8_t **fprints;
-	size_t num;
+	unsigned int num;
 } Constellation;
 
 Constellation* constellate(unsigned int fan, Peaks *peaks, uint64_t tdelta) {
@@ -416,7 +471,7 @@ Constellation* constellate(unsigned int fan, Peaks *peaks, uint64_t tdelta) {
 						return NULL;
 					}
 				}
-				c->fprints[c->num-1] = sfp(peaks->segs[i][j], peaks->segs[i][k], 0);
+				c->fprints[c->num-1] = afp(peaks->segs[i][j], peaks->segs[i][k], 0);
 				if (count == fan) {
 					goto end;
 				}
@@ -427,7 +482,7 @@ Constellation* constellate(unsigned int fan, Peaks *peaks, uint64_t tdelta) {
 					if (NULL == (c->fprints = realloc(c->fprints, c->num*sizeof(uint8_t*)))) {
 						return NULL;
 					}
-					c->fprints[c->num-1] = sfp(peaks->segs[i][j], peaks->segs[k][l], k-i);
+					c->fprints[c->num-1] = afp(peaks->segs[i][j], peaks->segs[k][l], k-i);
 					if (count == fan) {
 						goto end;
 					}
@@ -441,65 +496,4 @@ Constellation* constellate(unsigned int fan, Peaks *peaks, uint64_t tdelta) {
 
 Constellation* default_constellate(Peaks *peaks) {
 	return constellate(FAN_VALUE, peaks, TIME_DELTA);
-}
-
-int twlcs(Constellation *c1, Constellation *c2) {
-	int *col1, *col2; 
-	if (NULL == (col1 = malloc((c2->num+1)*sizeof(int)))) {
-		return FAILURE;
-	}
-	if (NULL == (col2 = malloc((c2->num+1)*sizeof(int)))) {
-		return FAILURE;
-	}
-	int i, j, k;
-	for (i = 0; i <= c2->num; i++) {
-		col1[i] = i;
-	}
-	for (i = 0; i < c1->num; i++) {
-		for (j = 0; j < c2->num; j++) {
-			for (k = 0; k < SFP_SIZE; k++) {
-				if (c1->fprints[i][k] != c2->fprints[j][k]) {
-					if (col2[j] > col1[j+1]) {
-						col2[j+1] = col2[j];
-					} else {
-						col2[j+1] = col1[j+1];
-					}
-					goto end;
-				}
-			}
-			if (col1[j] > col2[j] && col1[j] > col1[j+1]) {
-				col2[j+1] = col1[j] + 1;
-			} else if (col2[j] > col1[j] && col2[j] > col1[j+1]) {
-				col2[j+1] = col2[j] + 1;
-			} else {
-				col2[j+1] = col1[j+1] + 1;
-			}
-			end: col1 = col2;
-		}
-	}
-	int seqlen = col1[c2->num];
-	free(col1);
-	return seqlen;
-}
-
-double compare_constellations(Constellation *c1, Constellation *c2, double eps) {
-	double score;
-	if (c1->num < c2->num) {
-		score = c1->num;
-	} else {
-		score = c2->num;
-	}
-	int seqlen1, seqlen2;
-	if (FAILURE == (seqlen1 = twlcs(c1, c2))) {
-		return FAILURE;
-	}
-	if (FAILURE == (seqlen2 = twlcs(c2, c1))) {
-		return FAILURE;
-	}
-	if (seqlen1 > seqlen2) {
-		score = seqlen1 / score;
-	} else {
-		score = seqlen2 / score;
-	}
-	return score;
 }

@@ -85,8 +85,8 @@ int fft_decimation_time(unsigned int const len, double complex *z) {
 				temp1 = z[j], temp2 = cmplx1*z[j+b];
 				z[j] = temp1+temp2, z[j+b] = temp1-temp2;
 			}
+			cmplx1 *= cmplx2;
 		}
-		cmplx1 *= cmplx2;
 	}
 	return SUCCESS;
 }
@@ -124,7 +124,7 @@ int fft_real(unsigned int const len, double complex *z) {
 		z[i] = p[i<<1] + p[(i<<1)+1]*I;
 	}
 	free(p);
-	if (FAILURE == fft_decimation_freq(len2, z)) {
+	if (FAILURE == fft_decimation_time(len2, z)) {
 		return FAILURE;
 	}
 	double real1, real2, imag1, imag2;

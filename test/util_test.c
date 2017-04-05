@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <assert.h>
-#include "../hdr/util.h"
+#include "../h/util.h"
 
 int main() {
 	assert(3 == log2_floor(9));

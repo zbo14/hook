@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <complex.h>
-#include "../hdr/fft.h"
+#include "../h/fft.h"
 
 int main() {
 	size_t const len = 16;

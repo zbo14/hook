@@ -3,7 +3,7 @@
 #include <regex.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include "../hdr/analysis.h"
+#include "../h/analysis.h"
 
 int main(void) {
 	printf("Enter a path to an audio file: ");

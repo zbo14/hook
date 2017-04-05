@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "../hdr/analysis.h"
+#include "../h/analysis.h"
 
 int main(void) {
 	printf("Enter name of fingerprinted recording: ");

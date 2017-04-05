@@ -8,6 +8,7 @@
 #define SUCCESS 0
 #define FAILURE -1
 
+
 int pow2(int x) {
 	return x != 0 && (x&(x-1))==0;
 }
